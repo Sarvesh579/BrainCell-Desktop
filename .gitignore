@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+sandbox/venv/
+
+# Sandbox runtime files
+sandbox/outputs/
+sandbox/temp_scripts/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build / cache
+build/
+dist/
+*.egg-info/
+
+# Model / local configs
+*.sqlite
+config.local.py

@@ -1,12 +1,15 @@
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout,
-    QTextEdit, QLineEdit, QPushButton, QHBoxLayout
+    QApplication, QWidget, QVBoxLayout, QMenuBar,
+    QTextEdit, QLineEdit, QPushButton, QHBoxLayout,
+    QListWidget, QSplitter
 )
 from PySide6.QtGui import QTextCursor
 from app.controller import BrainCellController
 from PySide6.QtCore import QThread, Signal, QObject, QTimer
 import sys
-
+import markdown
+from utils.chat_storage import save_chat, load_chats
+import json
 
 class LLMWorker(QObject):
     token = Signal(str)
@@ -38,10 +41,19 @@ class ChatWindow(QWidget):
         self.thinking_state = 0
         self.thinking_timer.timeout.connect(self.update_thinking)
 
+        self.menu = QMenuBar(self)
+        file_menu = self.menu.addMenu("Chat")
+        new_chat_action = file_menu.addAction("New Chat")
+        new_chat_action.triggered.connect(self.new_chat)
+
         self.setWindowTitle("BrainCell Desktop")
         self.resize(700, 500)
 
-        layout = QVBoxLayout()
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.menu)
+
+        self.chat_list = QListWidget()
+        self.chat_list.itemClicked.connect(self.load_chat)
 
         self.chat_area = QTextEdit()
         self.chat_area.setReadOnly(True)
@@ -56,15 +68,54 @@ class ChatWindow(QWidget):
         input_layout.addWidget(self.input_box)
         input_layout.addWidget(self.send_button)
 
-        layout.addWidget(self.chat_area)
-        layout.addLayout(input_layout)
+        right_panel = QWidget()
+        right_layout = QVBoxLayout()
+        right_layout.addWidget(self.chat_area)
+        right_layout.addLayout(input_layout)
+        right_panel.setLayout(right_layout)
 
-        self.setLayout(layout)
+        splitter = QSplitter()
+        splitter.addWidget(self.chat_list)
+        splitter.addWidget(right_panel)
+        splitter.setSizes([200, 600])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        main_layout.addWidget(splitter)
+
+        self.setLayout(main_layout)
         self.apply_theme()
 
         # UI logic
         self.send_button.clicked.connect(self.handle_send)
         self.input_box.returnPressed.connect(self.handle_send)
+
+        self.refresh_chat_list()
+
+    def refresh_chat_list(self):
+        self.chat_list.clear()
+
+        chats = load_chats()
+
+        for chat in chats:
+            self.chat_list.addItem(chat)
+
+    def load_chat(self, item):
+        filename = item.text()
+        path = f"chats/{filename}"
+        with open(path, "r", encoding="utf-8") as f:
+            self.chat_history = json.load(f)
+
+        self.chat_area.clear()
+        for msg in self.chat_history:
+            if msg["role"] == "user":
+                self.chat_area.append(f"<br><b>You:</b> {msg['content']}")
+            else:
+                html = markdown.markdown(msg["content"])
+                self.chat_area.insertHtml(f"<br><span style='color:#2f9e44'><b>BrainCell:</b></span> {html}")
+                
+    def new_chat(self):
+        self.chat_area.clear()
+        self.chat_history = []
 
     def apply_theme(self):
         with open("ui/style.qss", "r") as f:
@@ -143,10 +194,17 @@ class ChatWindow(QWidget):
         self.send_button.setText("Send")
         self.send_button.clicked.disconnect()
         self.send_button.clicked.connect(self.handle_send)
+        response_md = self.current_response.strip()
+        response_html = markdown.markdown(response_md)
+
+        self.chat_area.insertHtml(f"<br>{response_html}<br>")
+
         self.chat_history.append({
             "role": "assistant",
-            "content": self.current_response.strip()
+            "content": response_md
         })
+        save_chat(self.chat_history)
+        self.refresh_chat_list()
         self.current_response = ""
 
     def stop_response(self):

@@ -18,6 +18,9 @@ sandbox/temp_scripts/
 # Environment variables
 .env
 
+# Chats
+chats/
+
 # IDE
 .vscode/
 .idea/

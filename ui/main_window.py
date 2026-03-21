@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QMenuBar,
+    QApplication, QWidget, QVBoxLayout, QMainWindow,
     QTextEdit, QLineEdit, QPushButton, QHBoxLayout,
     QListWidget, QSplitter
 )
@@ -10,6 +10,7 @@ import sys
 import markdown
 from utils.chat_storage import save_chat, load_chats
 import json
+from datetime import datetime
 
 class LLMWorker(QObject):
     token = Signal(str)
@@ -28,41 +29,38 @@ class LLMWorker(QObject):
         )
 
 
-class ChatWindow(QWidget):
+class ChatWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.controller = BrainCellController()
         self.is_running = False
         self.current_response = ""
         self.chat_history = []
+        self.chat_filename = None
 
         self.thinking = False
         self.thinking_timer = QTimer()
         self.thinking_state = 0
         self.thinking_timer.timeout.connect(self.update_thinking)
 
-        self.menu = QMenuBar(self)
+        self.setWindowTitle("BrainCell Desktop")
+        self.resize(1000, 800)
+
+        # Menu bar
+        self.menu = self.menuBar()
         file_menu = self.menu.addMenu("Chat")
         new_chat_action = file_menu.addAction("New Chat")
         new_chat_action.triggered.connect(self.new_chat)
 
-        self.setWindowTitle("BrainCell Desktop")
-        self.resize(700, 500)
-
         main_layout = QVBoxLayout()
-        main_layout.addWidget(self.menu)
 
         self.chat_list = QListWidget()
         self.chat_list.itemClicked.connect(self.load_chat)
-
         self.chat_area = QTextEdit()
         self.chat_area.setReadOnly(True)
 
         self.input_box = QLineEdit()
-        self.input_box.setPlaceholderText("Ask BrainCell...")
-
         self.send_button = QPushButton("Send")
-        self.send_button.setFixedSize(60, 40)
 
         input_layout = QHBoxLayout()
         input_layout.addWidget(self.input_box)
@@ -77,18 +75,21 @@ class ChatWindow(QWidget):
         splitter = QSplitter()
         splitter.addWidget(self.chat_list)
         splitter.addWidget(right_panel)
-        splitter.setSizes([200, 600])
-        splitter.setStretchFactor(0, 0)
+        splitter.setSizes([200, 800])
         splitter.setStretchFactor(1, 1)
+
         main_layout.addWidget(splitter)
 
-        self.setLayout(main_layout)
+        central_widget = QWidget()
+        central_widget.setLayout(main_layout)
+        self.setCentralWidget(central_widget)
+
         self.apply_theme()
 
         # UI logic
         self.send_button.clicked.connect(self.handle_send)
         self.input_box.returnPressed.connect(self.handle_send)
-
+        self.input_box.setPlaceholderText("Ask BrainCell...")
         self.refresh_chat_list()
 
     def refresh_chat_list(self):
@@ -116,6 +117,7 @@ class ChatWindow(QWidget):
     def new_chat(self):
         self.chat_area.clear()
         self.chat_history = []
+        self.chat_filename = None
 
     def apply_theme(self):
         with open("ui/style.qss", "r") as f:
@@ -128,7 +130,8 @@ class ChatWindow(QWidget):
         message = self.input_box.text().strip()
         if not message:
             return
-
+        if self.chat_filename is None:
+            self.chat_filename = datetime.now().strftime("%Y%m%d_%H%M%S") + ".json"
         self.chat_area.append(f"<br><b>You:</b> {message}")
         self.chat_history.append({"role": "user", "content": message})
         self.input_box.clear()
@@ -177,7 +180,7 @@ class ChatWindow(QWidget):
         self.current_response += token
         cursor = self.chat_area.textCursor()
         cursor.movePosition(QTextCursor.End)
-        cursor.insertText(token)
+        cursor.insertText(token)                #green response text. correct. should be printed. If you can, just save this itself with the green colour and span styling
         self.scroll_to_bottom()
 
     def start_response(self):
@@ -197,13 +200,13 @@ class ChatWindow(QWidget):
         response_md = self.current_response.strip()
         response_html = markdown.markdown(response_md)
 
-        self.chat_area.insertHtml(f"<br>{response_html}<br>")
+        #self.chat_area.insertHtml(f"<br>{response_html}<br>") #This shouldnt be printed. We want to savve it with the span styling and green colour
 
         self.chat_history.append({
             "role": "assistant",
             "content": response_md
         })
-        save_chat(self.chat_history)
+        save_chat(self.chat_history, self.chat_filename)
         self.refresh_chat_list()
         self.current_response = ""
 
@@ -211,6 +214,7 @@ class ChatWindow(QWidget):
         self.controller.stop()
         if hasattr(self, "thread"):
             self.thread.quit()
+            self.thread.wait()
         self.chat_area.append("<span style='color:#f08c00'><b>Stopped.</b></span>")
         self.end_response()
 

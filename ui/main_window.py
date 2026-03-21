@@ -49,8 +49,9 @@ class ChatWindow(QMainWindow):
         # Menu bar
         self.menu = self.menuBar()
         file_menu = self.menu.addMenu("Chat")
-        new_chat_action = file_menu.addAction("New Chat")
-        new_chat_action.triggered.connect(self.new_chat)
+        
+        self.new_chat_button = QPushButton("New Chat")
+        self.new_chat_button.clicked.connect(self.new_chat)
 
         main_layout = QVBoxLayout()
 
@@ -66,6 +67,12 @@ class ChatWindow(QMainWindow):
         input_layout.addWidget(self.input_box)
         input_layout.addWidget(self.send_button)
 
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(self.new_chat_button)
+        left_layout.addWidget(self.chat_list)
+        left_panel = QWidget()
+        left_panel.setLayout(left_layout)
+
         right_panel = QWidget()
         right_layout = QVBoxLayout()
         right_layout.addWidget(self.chat_area)
@@ -73,7 +80,7 @@ class ChatWindow(QMainWindow):
         right_panel.setLayout(right_layout)
 
         splitter = QSplitter()
-        splitter.addWidget(self.chat_list)
+        splitter.addWidget(left_panel)
         splitter.addWidget(right_panel)
         splitter.setSizes([200, 800])
         splitter.setStretchFactor(1, 1)
@@ -111,8 +118,8 @@ class ChatWindow(QMainWindow):
             if msg["role"] == "user":
                 self.chat_area.append(f"<br><b>You:</b> {msg['content']}")
             else:
-                html = markdown.markdown(msg["content"])
-                self.chat_area.insertHtml(f"<br><span style='color:#2f9e44'><b>BrainCell:</b></span> {html}")
+                html = markdown.markdown(msg["content"]).replace("<p>", "").replace("</p>", "")
+                self.chat_area.insertHtml(f"<br><br><span style='color:#2f9e44'><b>BrainCell:</b> {html}</span>")
                 
     def new_chat(self):
         self.chat_area.clear()
@@ -198,10 +205,6 @@ class ChatWindow(QMainWindow):
         self.send_button.clicked.disconnect()
         self.send_button.clicked.connect(self.handle_send)
         response_md = self.current_response.strip()
-        response_html = markdown.markdown(response_md)
-
-        #self.chat_area.insertHtml(f"<br>{response_html}<br>") #This shouldnt be printed. We want to savve it with the span styling and green colour
-
         self.chat_history.append({
             "role": "assistant",
             "content": response_md

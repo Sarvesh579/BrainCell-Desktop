@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QMainWindow,
     QTextEdit, QLineEdit, QPushButton, QHBoxLayout,
-    QListWidget, QSplitter
+    QListWidget, QSplitter, QListWidgetItem
 )
 from PySide6.QtGui import QTextCursor
 from app.controller import BrainCellController
@@ -11,6 +11,9 @@ import markdown
 from utils.chat_storage import save_chat, load_chats
 import json
 from datetime import datetime
+import re
+from latex2mathml.converter import convert as latex_to_mathml
+
 
 class LLMWorker(QObject):
     token = Signal(str)
@@ -32,6 +35,7 @@ class LLMWorker(QObject):
 class ChatWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.chat_title = None
         self.controller = BrainCellController()
         self.is_running = False
         self.current_response = ""
@@ -101,30 +105,60 @@ class ChatWindow(QMainWindow):
 
     def refresh_chat_list(self):
         self.chat_list.clear()
-
         chats = load_chats()
+        for file in chats:
+            path = f"chats/{file}"
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    title = data.get("title", file)
+            except:
+                title = file
+            item = QListWidgetItem(title)
+            item.setData(1, file)
+            self.chat_list.addItem(item)
 
-        for chat in chats:
-            self.chat_list.addItem(chat)
-
+    def render_markdown(self, text):
+        def repl(match):
+            latex = match.group(1)
+            try:
+                return latex_to_mathml(latex)
+            except:
+                return latex
+        text = re.sub(r"\$(.*?)\$", repl, text)
+        return markdown.markdown(
+            text,
+            extensions=[
+                "fenced_code",
+                "tables",
+                "pymdownx.superfences",
+                "pymdownx.highlight"
+            ]
+        )
+    
     def load_chat(self, item):
-        filename = item.text()
+        filename = item.data(1)
         path = f"chats/{filename}"
         with open(path, "r", encoding="utf-8") as f:
-            self.chat_history = json.load(f)
+            data = json.load(f)
+
+        self.chat_history = data["messages"]
+        self.chat_title = data["title"]
+        self.chat_filename = filename
 
         self.chat_area.clear()
         for msg in self.chat_history:
             if msg["role"] == "user":
                 self.chat_area.append(f"<br><b>You:</b> {msg['content']}")
             else:
-                html = markdown.markdown(msg["content"]).replace("<p>", "").replace("</p>", "")
+                html = self.render_markdown(msg["content"]).replace("<p>", "").replace("</p>", "")
                 self.chat_area.insertHtml(f"<br><br><span style='color:#2f9e44'><b>BrainCell:</b> {html}</span>")
                 
     def new_chat(self):
         self.chat_area.clear()
         self.chat_history = []
         self.chat_filename = None
+        self.chat_title = None
 
     def apply_theme(self):
         with open("ui/style.qss", "r") as f:
@@ -139,6 +173,7 @@ class ChatWindow(QMainWindow):
             return
         if self.chat_filename is None:
             self.chat_filename = datetime.now().strftime("%Y%m%d_%H%M%S") + ".json"
+            self.chat_title = message[:40]
         self.chat_area.append(f"<br><b>You:</b> {message}")
         self.chat_history.append({"role": "user", "content": message})
         self.input_box.clear()
@@ -201,16 +236,21 @@ class ChatWindow(QMainWindow):
     def end_response(self):
         self.is_running = False
         self.input_box.setDisabled(False)
+
         self.send_button.setText("Send")
         self.send_button.clicked.disconnect()
         self.send_button.clicked.connect(self.handle_send)
+
         response_md = self.current_response.strip()
+
         self.chat_history.append({
             "role": "assistant",
             "content": response_md
         })
-        save_chat(self.chat_history, self.chat_filename)
+
+        save_chat(self.chat_history, self.chat_filename, self.chat_title)
         self.refresh_chat_list()
+
         self.current_response = ""
 
     def stop_response(self):

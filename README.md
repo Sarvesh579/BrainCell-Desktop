@@ -25,7 +25,7 @@ Can read local files, process data, and automate tasks using natural language.
 ```
 pip install -r requirements.txt
 ollama pull llama3
-python app/main.py
+python -m app.main
 ```
 
 ### Project Structure

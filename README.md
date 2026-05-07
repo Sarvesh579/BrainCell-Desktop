@@ -33,10 +33,5 @@ python -m app.main
 Short tree of folders.
 
 ### Security Model
-
-* Read access: system files
+* Read access: user accessible system files
 * Write/execute: **sandbox only**
-
-### License
-
-MIT / project license.

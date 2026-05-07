@@ -1,6 +1,9 @@
-QWidget {
+QMainWindow, QWidget {
     background-color: #0f1115;
     color: #e6e6e6;
+}
+
+QLineEdit, QPushButton, QListWidget {
     font-size: 14px;
 }
 

@@ -4,6 +4,9 @@ class BrainCellController:
     def __init__(self):
         self.running = False
         self.llm = OllamaClient()
+    
+    def set_model(self, model):
+        self.llm.set_model(model)
 
     def run(self, history, token_callback, done_callback):
         self.running = True

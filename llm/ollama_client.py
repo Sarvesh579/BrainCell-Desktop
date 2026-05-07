@@ -4,6 +4,9 @@ class OllamaClient:
     def __init__(self, model="llama3:8b"):
         self.model = model
 
+    def set_model(self, model):
+        self.model = model
+
     def stream(self, messages):
         stream = ollama.chat(
             model = self.model,

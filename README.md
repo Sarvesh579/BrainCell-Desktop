@@ -28,10 +28,6 @@ ollama pull llama3
 python -m app.main
 ```
 
-### Project Structure
-
-Short tree of folders.
-
 ### Security Model
 * Read access: user accessible system files
 * Write/execute: **sandbox only**
